@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isLinkedGuardian(userId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/links/$(request.auth.uid + '_' + userId));
+    }
+
+    // A guardian invite code. Created by the protected person, read by
+    // whoever holds the code (so they can redeem it), updated once on accept.
+    match /guardianInvites/{code} {
+      allow create: if isOwner(request.resource.data.userId);
+      allow read: if isSignedIn();
+      allow update: if isSignedIn() &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.code == resource.data.code;
+    }
+
+    // guardianUid_userId -> proof that a guardian may see a given user's incidents.
+    match /links/{linkId} {
+      allow create: if isOwner(request.resource.data.guardianUid) ||
+        (isSignedIn() && request.auth.uid == request.resource.data.guardianUid);
+      allow read: if isSignedIn() && request.auth.uid == resource.data.guardianUid;
+    }
+
+    match /incidents/{incidentId} {
+      allow create: if isOwner(request.resource.data.userId);
+      allow read: if isOwner(resource.data.userId) || isLinkedGuardian(resource.data.userId);
+      // Owner updates their own incident (location, etc). Linked guardians may
+      // only change status (e.g. marking it resolved).
+      allow update: if isOwner(resource.data.userId) ||
+        (isLinkedGuardian(resource.data.userId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']));
+
+      match /timeline/{eventId} {
+        allow read: if isOwner(get(/databases/$(database)/documents/incidents/$(incidentId)).data.userId) ||
+          isLinkedGuardian(get(/databases/$(database)/documents/incidents/$(incidentId)).data.userId);
+        allow create: if isOwner(get(/databases/$(database)/documents/incidents/$(incidentId)).data.userId) ||
+          isLinkedGuardian(get(/databases/$(database)/documents/incidents/$(incidentId)).data.userId);
+      }
+    }
+  }
+}
