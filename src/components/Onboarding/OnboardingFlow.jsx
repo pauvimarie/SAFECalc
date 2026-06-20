@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import WelcomeScreen from './WelcomeScreen'
 import FeaturesScreen from './FeaturesScreen'
+import PermissionScreen from './PermissionScreen'
 import GuardianSetupScreen from './GuardianSetupScreen'
 
 export default function OnboardingFlow({ userId, onComplete }) {
@@ -11,6 +12,9 @@ export default function OnboardingFlow({ userId, onComplete }) {
   }
   if (step === 1) {
     return <FeaturesScreen onContinue={() => setStep(2)} />
+  }
+  if (step === 2) {
+    return <PermissionScreen userId={userId} onContinue={() => setStep(3)} />
   }
   return <GuardianSetupScreen userId={userId} onFinish={() => onComplete()} />
 }

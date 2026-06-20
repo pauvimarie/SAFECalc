@@ -49,12 +49,40 @@ export async function cancelIncident(incidentId) {
   await addTimelineEvent(incidentId, 'cancelled', 'Cancelled by user (000)')
 }
 
+export async function acknowledgeIncident(incidentId) {
+  await updateDoc(doc(db, 'incidents', incidentId), {
+    acknowledged: true,
+    acknowledgedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+  await addTimelineEvent(incidentId, 'acknowledged', 'Guardian received alert')
+}
+
 export async function setIncidentLocation(incidentId, coords) {
   await updateDoc(doc(db, 'incidents', incidentId), {
     location: coords,
     updatedAt: serverTimestamp(),
   })
   await addTimelineEvent(incidentId, 'location', 'Location captured')
+}
+
+// Stored as a small base64 JPEG directly on the incident doc — no Firebase
+// Storage, no billing. Keep captures under ~150KB (see capturePhotoThumbnail)
+// so this stays well inside Firestore's 1MiB document limit.
+export async function setIncidentPhoto(incidentId, dataUrl) {
+  await updateDoc(doc(db, 'incidents', incidentId), { photo: dataUrl, updatedAt: serverTimestamp() })
+  await addTimelineEvent(incidentId, 'photo', 'Photo captured')
+}
+
+// The microphone is used for a one-time ambient loudness check, not
+// recording — only the peak number is ever written, never audio.
+export async function setIncidentSoundCheck(incidentId, result) {
+  await updateDoc(doc(db, 'incidents', incidentId), { soundCheck: result, updatedAt: serverTimestamp() })
+  await addTimelineEvent(
+    incidentId,
+    'sound',
+    result.detected ? `Loud sound detected nearby (peak ${result.peak})` : 'Ambient check: quiet'
+  )
 }
 
 // ---------- Timeline (subcollection) ----------
@@ -139,6 +167,12 @@ export async function getGuardianLinks(guardianUid) {
 
 // ---------- Live incident feed for a guardian ----------
 
+export function tsMillis(ts) {
+  if (!ts) return Date.now()
+  if (ts.seconds) return ts.seconds * 1000 + (ts.nanoseconds || 0) / 1e6
+  return Date.now()
+}
+
 export function listenIncidentsForUsers(userIds, callback) {
   if (!userIds.length) {
     callback([])
@@ -146,11 +180,15 @@ export function listenIncidentsForUsers(userIds, callback) {
   }
   // Firestore 'in' supports up to 30 values, fine for a hackathon-scale guardian list.
   const q = query(collection(db, 'incidents'), where('userId', 'in', userIds.slice(0, 30)))
-  return onSnapshot(q, (snap) => {
-    const incidents = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-    incidents.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
-    callback(incidents)
-  })
+  return onSnapshot(
+    q,
+    (snap) => {
+      const incidents = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+      incidents.sort((a, b) => tsMillis(b.createdAt) - tsMillis(a.createdAt))
+      callback(incidents)
+    },
+    (err) => console.error('Incident feed error:', err)
+  )
 }
 
 export function tsToDate(ts) {
@@ -158,4 +196,20 @@ export function tsToDate(ts) {
   if (ts instanceof Timestamp) return ts.toDate()
   if (ts.seconds) return new Date(ts.seconds * 1000)
   return null
+}
+
+// ---------- Permission status ----------
+
+export async function savePermissionStatus(userId, status) {
+  await setDoc(
+    doc(db, 'users', userId),
+    { permissions: status, updatedAt: serverTimestamp() },
+    { merge: true }
+  )
+}
+
+export function listenPermissionStatus(userId, callback) {
+  return onSnapshot(doc(db, 'users', userId), (snap) => {
+    callback(snap.exists() ? snap.data().permissions || null : null)
+  })
 }

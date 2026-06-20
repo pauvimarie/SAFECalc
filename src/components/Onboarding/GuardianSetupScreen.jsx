@@ -33,9 +33,15 @@ export default function GuardianSetupScreen({ userId, onFinish }) {
   return (
     <div className="h-full flex flex-col px-7 py-12 bg-black text-white animate-fadeIn overflow-y-auto">
       <h1 className="text-3xl font-semibold tracking-tight">Guardian Setup</h1>
-      <p className="text-neutral-400 text-[15px] mt-2 mb-6">
+      <p className="text-neutral-400 text-[15px] mt-2 mb-1">
         Add the people who should be alerted if something happens to you.
       </p>
+      {userId && (
+        <p className="text-neutral-600 text-[11px] font-mono mb-6">
+          This device: {userId.slice(0, 8)} — trigger 911/111/222/333 from this same install for alerts to reach
+          guardians linked here.
+        </p>
+      )}
 
       <div className="flex gap-2 mb-4 flex-wrap">
         {RELATIONS.map((r) => (
@@ -86,7 +92,7 @@ export default function GuardianSetupScreen({ userId, onFinish }) {
         ))}
         {added.length === 0 && (
           <p className="text-neutral-500 text-[14px] text-center mt-6">
-            No guardians added yet. You can add them later from settings too.
+            No guardians added yet. You can add them later from /setup too.
           </p>
         )}
       </div>

@@ -1,6 +1,6 @@
 import IncidentCard from './IncidentCard'
 
-export default function IncidentFeed({ incidents }) {
+export default function IncidentFeed({ incidents, newestId }) {
   if (!incidents.length) {
     return (
       <div className="text-center py-16">
@@ -12,7 +12,7 @@ export default function IncidentFeed({ incidents }) {
   return (
     <div className="flex flex-col gap-3">
       {incidents.map((inc) => (
-        <IncidentCard key={inc.id} incident={inc} />
+        <IncidentCard key={inc.id} incident={inc} isNewest={inc.id === newestId} />
       ))}
     </div>
   )

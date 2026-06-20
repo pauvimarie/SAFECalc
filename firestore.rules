@@ -32,14 +32,21 @@ service cloud.firestore {
       allow read: if isSignedIn() && request.auth.uid == resource.data.guardianUid;
     }
 
+    // Per-user document: stores granted/denied browser permission status
+    // (location, camera, microphone, notification). Owner only.
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
     match /incidents/{incidentId} {
       allow create: if isOwner(request.resource.data.userId);
       allow read: if isOwner(resource.data.userId) || isLinkedGuardian(resource.data.userId);
       // Owner updates their own incident (location, etc). Linked guardians may
-      // only change status (e.g. marking it resolved).
+      // only change status or acknowledge receipt — never rewrite content.
       allow update: if isOwner(resource.data.userId) ||
         (isLinkedGuardian(resource.data.userId) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']));
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'acknowledged', 'acknowledgedAt', 'updatedAt']));
 
       match /timeline/{eventId} {
         allow read: if isOwner(get(/databases/$(database)/documents/incidents/$(incidentId)).data.userId) ||

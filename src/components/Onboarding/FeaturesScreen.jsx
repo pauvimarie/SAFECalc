@@ -1,7 +1,7 @@
 const FEATURES = [
   { title: 'Discreet emergency activation', desc: 'Trigger help from inside a calculator that looks completely normal.' },
   { title: 'Trusted contact alerts', desc: 'The people you choose are notified the moment you need them.' },
-  { title: 'Evidence preservation', desc: 'Photos, audio, and location are saved securely as they happen.' },
+  { title: 'Location vault', desc: 'Your location and incident timeline are saved securely as they happen.' },
   { title: 'Live location sharing', desc: 'Your guardians can see where you are for as long as it matters.' },
 ]
 
